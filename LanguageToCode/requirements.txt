@@ -1,0 +1,4 @@
+python -m spacy download en
+pip install spacy
+pip install nltk
+pip install StackAPI

@@ -1,0 +1,15 @@
+#TAG-CLASS
+class Solution:
+    def __init__(self):
+        #TAG-INIT
+        pass
+    def run(self #TAG-ARGS):
+        #TAG-RUN
+        pass
+    #TAG-METHOD
+
+if __name__ == '__main__':
+    s = Solution()
+    #TAG-SCRIPT
+    print('successfully compiled')
+
