@@ -119,7 +119,7 @@ class engine:
 
         # 1. Extract the run method
         runIndx = None
-        for i, line in enumerate(baseCode): # fine the end code args code
+        for i, line in enumerate(combinedCode): # fine the end code args code
             if line.data[:8] == 'def run(':
                 runIndx = i
         run_script = combinedCode[runIndx:self.tag_library['#TAG-RUN']]
@@ -160,6 +160,74 @@ class engine:
         # just return the first values in the dictionary for now
 
         return combinedCode
+
+    def evolve(self, pools, test_cases):
+        methods_in_solution = len(pools)
+        token_methods = []
+        token_calls = []
+        # print("number of method in solution", methods_in_solution)
+        ######### Load Template as Token and Predicted Code ##########
+        print()
+        print("4: Code from Docs Selected  ===============")
+        baseCode = driver.load_empty_template_as_list()
+        for data in pools:
+            temp_method = []
+            temp_call = []
+            for row in data:
+                temp_method.append(driver.load_code_as_list(row[2]))
+                temp_call.append(driver.load_code_as_list(row[3]))
+            token_methods.append(temp_method)
+            token_calls.append(temp_call)
+        ##############################################################
+
+        #################### Handle Input Args #######################
+        combinedCode = driver.set_inputs(baseCode, inputs)
+        ##############################################################
+
+        ################## Combining Code loop #######################
+        combo_counter = [len(row) for row in token_calls]
+        combo_tracker = [0] * len(combo_counter)
+        while combo_counter[0] > combo_tracker[0]:
+            i = len(combo_tracker)-1
+            combo_tracker[i] += 1
+            while combo_tracker[i] >= combo_counter[i]:
+                combo_tracker[i] = 0
+                i-=1
+                combo_tracker[i] += 1
+                if i == 0: break
+
+            for method_index in range(methods_in_solution):
+                combinedCode = driver.combine(combinedCode, token_methods[method_index][combo_tracker[method_index]], 'METHOD')
+                combinedCode = driver.combine(combinedCode, token_calls[method_index][combo_tracker[method_index]], 'RUN')
+
+            ###################### Handle Output #########################
+            combinedCode = driver.set_output(combinedCode, outputs)
+            ##############################################################
+
+            ####################### String Vars ##########################
+            # combinedCode = driver.string_vars(combinedCode, inputs)
+            ##############################################################
+
+            driver.write_code_from_list('out.py', combinedCode)
+
+            exit()
+        ##############################################################
+
+
+
+
+
+        #################### Run and Get Results #####################
+        print()
+        print("5: Compile Check  =========================")
+
+        driver.compile_new_code('out.py')
+        print()
+        print("6: Run Test Cases  ========================")
+        driver.run_test_cases('out.py',
+                              [([1, 2, 3, 4], 3), ([151, 1531, 1763, 41632], 151), ([2], 2), ([-1, 2, 45, 3], 3)])
+        ##############################################################
+        return
 
 
 
@@ -234,31 +302,6 @@ class engine:
 
 
 
-    # def predict_pre_process(self, inputs, topLevel):
-    #     database = sqlite3.connect(self.database_filepath)
-    #     cursor = database.cursor()
-    #     pre_processes = []
-    #     for input in inputs:
-    #         for method in topLevel:
-    #             if input.type in self.shortenedWords:
-    #                 in_type = self.shortenedWords[input.type]
-    #             else:
-    #                 in_type = input.type
-    #             if method[self.db_key['parameters']] in self.shortenedWords:
-    #                 method_type = self.shortenedWords[method[self.db_key['parameters']]]
-    #             else:
-    #                 method_type = method[self.db_key['parameters']]
-    #
-    #             if method_type != in_type and method_type != in_type: # then we know that we need to convert data types
-    #                 # print(in_type, method_type)
-    #                 cursor.execute(f"SELECT * FROM 'algorithms' WHERE name IS '{in_type} to {method_type}' ")
-    #                 payloads = cursor.fetchall()
-    #                 pre_processes.append(payloads[0])
-    #     cursor.close()
-    #     return pre_processes
-
-
-
     def combine(self, baseCode, predictSolution, tag):
         indexOfTag = self.tag_library['#TAG-'+tag]
         parentIndent = baseCode[indexOfTag].indents
@@ -305,47 +348,13 @@ if __name__ == '__main__':
     print("2: Predicted Actions ======================")
     print(actions)
 
-    ####################### Create 2 pools #######################
+    ######################## Create pools ########################
     print()
     print("3: Suggested Code =========================")
     pools = driver.collect_pool(actions, live=False, num=7)
     print(pools)
-    # ##############################################################
-    exit()
-    ######### Load Template as Token and Predicted Code ##########
-    print()
-    print("4: Code from Docs Selected  ===============")
-    baseCode = driver.load_empty_template_as_list()
-    newMethod = driver.load_code_as_list(pools[0][2]) # 2 == payload
-    callCode = driver.load_code_as_list(pools[0][3])
-    ##############################################################
+    # ############################################################
 
-    #################### Handle Input Args #######################
-    combinedCode = driver.set_inputs(baseCode, inputs)
+    ##################### Begin the Evolution ####################
+    driver.evolve(pools, [([1, 2, 3, 4], 3), ([151, 1531, 1763, 41632], 151), ([2], 2), ([-1, 2, 45, 3], 3)])
     ##############################################################
-
-    ####################### Combining Code #######################
-    combinedCode = driver.combine(combinedCode, newMethod, 'METHOD')
-    combinedCode = driver.combine(combinedCode, callCode, 'RUN')
-    ##############################################################
-
-    ###################### Handle Output #########################
-    combinedCode = driver.set_output(combinedCode, outputs)
-    ##############################################################
-
-    ####################### String Vars ##########################
-    combinedCode = driver.string_vars(combinedCode, inputs)
-    ##############################################################
-
-    #################### Run and Get Results #####################
-    print()
-    print("5: Compile Check  =========================")
-    driver.write_code_from_list('out.py', combinedCode)
-    driver.compile_new_code('out.py')
-    print()
-    print("6: Run Test Cases  ========================")
-    driver.run_test_cases('out.py', [([1,2,3,4], 3), ([151,1531,1763,41632],151), ([2],2), ([-1,2,45,3],3)])
-    ##############################################################
-
-    # pre_process = driver.predict_pre_process(inputs, top_level_solutions)
-    # print(pre_process)
