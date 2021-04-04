@@ -10,11 +10,23 @@ __status__ = "Development"
 from stackapi import StackAPI
 import re
 import sqlite3
+import subprocess
+
+class codeObj:
+    def __init__(self, data, indents):
+        self.data = data
+        self.indents = indents
+
+    def __str__(self):
+        return f"w {self.indents} : {self.data}"
+
 
 class fromTheOverflow:
 
     def __init__(self):
         self.__DataBaseFilePath__ = "N:\\_Programming\\nltc\\data\\algorithms.db"
+        self.template_path = 'N:\\_Programming\\nltc\\data\\CompileTemplate.tmplt'
+        self.tag_library = {}
 
     def exeSqlInsert(self, command):
         connection = sqlite3.connect(self.__DataBaseFilePath__)
@@ -38,54 +50,146 @@ class fromTheOverflow:
 
 
 
+    def compile_new_code(self, filename, debug=True):
+        cmd = 'python ' + filename
+        process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+        if stdout != "" and debug:
+            print(stdout.decode('utf-8'))
+        if stderr != "" and debug:
+            print(stderr.decode('utf-8'))
+        return stderr.decode('utf-8')
+
+
+
+    def combine(self, baseCode, predictSolution, tag):
+        indexOfTag = self.tag_library['#TAG-' + tag]
+        parentIndent = baseCode[indexOfTag].indents
+        for line in predictSolution[::-1]:
+            line.indents += parentIndent
+            baseCode.insert(indexOfTag, line)
+        self.update_tag_indexes(baseCode)
+        return baseCode
+
+
+
+    def update_tag_indexes(self, baseCode):
+        for i, line in enumerate(baseCode):
+            if line.data[0:4] == "#TAG":
+                self.tag_library[line.data] = i
+
+
+
+    def load_empty_template_as_list(self):
+        template = open(self.template_path, 'r')
+        templateList = []
+        for i, line in enumerate(template):
+            whiteSpace = next((i for i, c in enumerate(line) if c != ' '), len(line))
+            noSpaces = line.strip()
+            templateList.append(codeObj(noSpaces, whiteSpace))
+            if noSpaces[0:4] == '#TAG':
+                self.tag_library[noSpaces] = i
+        return templateList
+
+
+
+    def load_code_as_list(self, s):
+        templateList = []
+        for i, line in enumerate(s.split('\n')):
+            whiteSpace = next((i for i, c in enumerate(line) if c != ' '), len(line))
+            noSpaces = line.strip()
+            templateList.append(codeObj(noSpaces, whiteSpace))
+            if noSpaces[0:4] == '#TAG':
+                self.tag_library[noSpaces] = i
+        return templateList
+
+
+
+    def write_code_from_list(self, filename, code):
+        outFile = open(filename, 'r+')
+        outFile.truncate(0)
+        for line in code:
+            outFile.write(' '*line.indents+line.data+'\n')
+        outFile.close()
+
+
+
     def get_recent(self, num, table):
         return self.exeSqlSelect(f"SELECT * FROM {table} ORDER BY PID desc limit {num}")
 
 
-    def load_into_db(self, code, desc, q_id):
-        defName = "NONE"    #
-        payload = "NONE"
-        call = "NONE"       #
-        params = "NONE"     #
+    def load_into_db(self, code, desc):
+        payload = code[4]
+        payload = payload.replace("'","''")
+        payload = payload.split('\n')
+        payload = "'||char(10)||'".join(payload)
+        payload = payload.replace("''||", "")
+        payload = payload.strip()
+        defName = code[0]
+        call = code[1]
+        str_params = ','.join(code[2])
+        q_id = code[3]
         returndata = "NONE" # maybe run some test cases to find out what it returns???
         insert_line = "NONE"
-        lines = code.split('\n')
-        for i, line in enumerate(lines):
-            line = line.strip()
-            if line[:3] == 'def':
-                defLine = i
-                # Find def name
-                defName = line.split(' ',1)[1]
-                defName, params = defName.split('(')
-                # Find params
-                params = params.replace('):', '')
-                params = params.split(',')
-                params = [p.strip() for p in params]
-                str_params = ','.join(params)
+        sql_cmd = f"INSERT INTO algorithms_temp (name, payload, call, parameters, return, line, Desc, QID) VALUES (" \
+                  f"'{defName}','{payload}','{call}','{str_params}','{returndata}','{insert_line}','{desc}', '{q_id}')"
+        print(sql_cmd)
+        self.exeSqlInsert(sql_cmd)
 
-                # Find call
-                call = 'self.' + defName + '(' + '#TAG-VAR,'*len(params)
-                call = call[:-1] + ')'
 
-        if defName!="NONE" and params!="NONE" and call!="NONE":
-            # insert into database
-            if 'self' in params[0] or params[0] == '':
-                if len(params) == 0:
-                    payload = 'def '+defName+'('+','.join(params) + '):\\n'
+
+    def filter(self, ready_code, code_qid):
+        # print(ready_code)
+        # print(code_qid)
+        defName = "NONE"
+        params = "NONE"
+        call = "NONE"
+        payload = "NONE"
+        passed_filter = []
+        for q_index, code in enumerate(ready_code):
+            baseCode = self.load_empty_template_as_list()
+            lines = code.split('\n')
+            for i, line in enumerate(lines):
+                if line[:3] == 'def':
+                    defLine = i
+                    # Find def name
+                    defName = line.split(' ', 1)[1]
+                    defName, params = defName.split('(')
+                    # Find params
+                    params = params.replace('):', '')
+                    params = params.split(',')
+                    params = [p.strip() for p in params]
+                    str_params = ','.join(params)
+
+                    # Find call
+                    call = 'self.' + defName + '(' + '#TAG-VAR,' * len(params)
+                    call = call[:-1] + ')'
+                    # print(defName, params, call)
+            if defName != "NONE" and params != "NONE" and call != "NONE":
+                if 'self' in params[0] or params[0] == '':
+                    if len(params) == 0:
+                        payload = 'def '+defName+'('+','.join(params) + '):\n'
+                    else:
+                        payload = 'def ' + defName + '(self):\n'
                 else:
-                    payload = 'def ' + defName + '(self):\\n'
-            else:
-                if len(params) == 0:
-                    payload = 'def '+defName+'(self):\\n'
-                else:
-                    payload = 'def ' + defName + '(self,' + ','.join(params) + '):\\n'
-            payload += '\\n'.join(lines[defLine+1:])
-            payload = payload.strip()
-            payload = payload.replace("'","''")
-            sql_cmd = f"INSERT INTO algorithms_temp (name, payload, call, parameters, return, line, Desc, QID) VALUES (" \
-                      f"'{defName}','{payload}','{call}','{str_params}','{returndata}','{insert_line}','{desc}', '{q_id}')"
-            # print(sql_cmd)
-            self.exeSqlInsert(sql_cmd)
+                    if len(params) == 0:
+                        payload = 'def '+defName+'(self):\n'
+                    else:
+                        payload = 'def ' + defName + '(self,' + ','.join(params) + '):\n'
+                payload += "\n".join(lines[defLine+1:])
+
+            combinedCode = self.combine(baseCode, self.load_code_as_list(payload), 'METHOD')
+            # combinedCode = self.combine(combinedCode, self.load_code_as_list(call), 'RUN')
+
+            self.write_code_from_list('compile.py', combinedCode)
+
+            c = self.compile_new_code('compile.py', debug=False)
+            if c == "":
+                passed_filter.append([defName, call, params, code_qid[q_index], payload])
+
+        return passed_filter
+
+
 
     def run(self, desc, live=True, num=5):
         if not live:
@@ -123,9 +227,11 @@ class fromTheOverflow:
 
         # print(ready_code)
 
+        filtered_code = self.filter(ready_code, code_qid)
+        # print(filtered_code)
         # Read code and load into data base
-        for i, snippet in enumerate(ready_code):
-            self.load_into_db(snippet, desc, code_qid[i])
+        for i, snippet in enumerate(filtered_code):
+            self.load_into_db(snippet, desc)
 
         print(f"{len(ready_code)} new methods loaded")
         return self.get_recent(len(ready_code), 'algorithms_temp')

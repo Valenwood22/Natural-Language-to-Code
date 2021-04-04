@@ -35,7 +35,7 @@ class engine:
 
 
     def load_empty_template_as_list(self):
-        template = open('N:\\_Programming\\openai\\data\\EmptyTemplate.tmplt','r')
+        template = open('N:\\_Programming\\nltc\\data\\EmptyTemplate.tmplt','r')
         templateList = []
         for i, line in enumerate(template):
             whiteSpace = next((i for i, c in enumerate(line) if c != ' '), len(line))
@@ -169,19 +169,19 @@ class engine:
         ######### Load Template as Token and Predicted Code ##########
         print()
         print("4: Code from Docs Selected  ===============")
-        baseCode = driver.load_empty_template_as_list()
+        baseCode = self.load_empty_template_as_list()
         for data in pools:
             temp_method = []
             temp_call = []
             for row in data:
-                temp_method.append(driver.load_code_as_list(row[2]))
-                temp_call.append(driver.load_code_as_list(row[3]))
+                temp_method.append(self.load_code_as_list(row[2]))
+                temp_call.append(self.load_code_as_list(row[3]))
             token_methods.append(temp_method)
             token_calls.append(temp_call)
         ##############################################################
 
         #################### Handle Input Args #######################
-        combinedCode = driver.set_inputs(baseCode, inputs)
+        combinedCode = self.set_inputs(baseCode, inputs)
         ##############################################################
 
         ################## Combining Code loop #######################
@@ -197,18 +197,18 @@ class engine:
                 if i == 0: break
 
             for method_index in range(methods_in_solution):
-                combinedCode = driver.combine(combinedCode, token_methods[method_index][combo_tracker[method_index]], 'METHOD')
-                combinedCode = driver.combine(combinedCode, token_calls[method_index][combo_tracker[method_index]], 'RUN')
+                combinedCode = self.combine(combinedCode, token_methods[method_index][combo_tracker[method_index]], 'METHOD')
+                combinedCode = self.combine(combinedCode, token_calls[method_index][combo_tracker[method_index]], 'RUN')
 
             ###################### Handle Output #########################
-            combinedCode = driver.set_output(combinedCode, outputs)
+            combinedCode = self.set_output(combinedCode, outputs)
             ##############################################################
 
             ####################### String Vars ##########################
             # combinedCode = driver.string_vars(combinedCode, inputs)
             ##############################################################
 
-            driver.write_code_from_list('out.py', combinedCode)
+            self.write_code_from_list('out.py', combinedCode)
 
             exit()
         ##############################################################
@@ -221,10 +221,10 @@ class engine:
         print()
         print("5: Compile Check  =========================")
 
-        driver.compile_new_code('out.py')
+        self.compile_new_code('out.py')
         print()
         print("6: Run Test Cases  ========================")
-        driver.run_test_cases('out.py',
+        self.run_test_cases('out.py',
                               [([1, 2, 3, 4], 3), ([151, 1531, 1763, 41632], 151), ([2], 2), ([-1, 2, 45, 3], 3)])
         ##############################################################
         return
@@ -351,7 +351,7 @@ if __name__ == '__main__':
     ######################## Create pools ########################
     print()
     print("3: Suggested Code =========================")
-    pools = driver.collect_pool(actions, live=False, num=7)
+    pools = driver.collect_pool(actions, live=True, num=7)
     print(pools)
     # ############################################################
 
