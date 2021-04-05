@@ -37,6 +37,7 @@ class engine:
     def load_empty_template_as_list(self):
         template = open('N:\\_Programming\\nltc\\data\\EmptyTemplate.tmplt','r')
         templateList = []
+        self.tag_library.clear()
         for i, line in enumerate(template):
             whiteSpace = next((i for i, c in enumerate(line) if c != ' '), len(line))
             noSpaces = line.strip()
@@ -99,7 +100,7 @@ class engine:
 
 
 
-    def string_vars(self, combinedCode, inputs):
+    def evolve_vars(self, combinedCode, inputs):
 
         def find_predictions(param, input_pool, shortenedWords):
             ans = []
@@ -126,50 +127,91 @@ class engine:
         input_pool = inputs
         to_try = OrderedDict()
         to_try_ticker = []
+        newVarCntr = 0
         for i, run_line in enumerate(run_script): # INPUTS MUST ALREADY BE IN PLACE!
             # 2. Find holes
             if '#TAG-VAR' in run_line.data:
+                # print(run_line.data)
                 call, extracted = run_line.data.split('(')
                 extracted = extracted.split(')')[0]
                 params = extracted.split(',')
+                if run_line.data[:6] != 'return':
+                    newvar = 'localVar' + str(newVarCntr)
+                    run_line.data = newvar + '=' + run_line.data
+                    newVarCntr += 1
                 for j, param in enumerate(params):
+                    # print(j, param)
                     to_try[f'{runIndx+i}_{j}'] = find_predictions(param, input_pool, self.interchangeableWords)
-                    to_try_ticker.append((0, len(to_try[f'{runIndx+i}_{j}'])))
-            # TODO: add new variables to the pool!
+
+                    to_try_ticker.append(len(to_try[f'{runIndx+i}_{j}']))
+
+                if run_line.data[:6] != 'return':
+                    input_pool.append(dataType(name=newvar))
 
         # print(to_try)
-        s = []
-        for key, item in to_try.items():
-        # while to_try_ticker[-1][0] < to_try_ticker[-1][1]:
+        # print(to_try_ticker)
+        to_try_tracker = [0] * len(to_try_ticker)
+        while to_try_ticker[0] > to_try_tracker[0]:
+            i = len(to_try_tracker) - 1
+
+            while to_try_tracker[i] >= to_try_ticker[i]:
+                to_try_tracker[i] = 0
+                i -= 1
+                to_try_tracker[i] += 1
+                if i == 0: break
+
+            if to_try_tracker[0] >= to_try_ticker[0]: break
+
+            s = []
+            j = 0
             last = '-1'
-            if key[0] == last or last == '-1':
-                s.append(item[0])
-            else:
-                # flush s
-                insert = ','.join([d.name for d in s])
-                insert = f'({insert})'
-                # run_script[int(key[0])+1]
-                s.clear()
-            last = key[0]
+            for key, item in to_try.items():
+                if key[0] == last or last == '-1':
+                    s.append(item[to_try_tracker[j]])
+                else:
+                    # flush s
+                    insert = ','.join([d.name for d in s])
+                    insert = f'({insert})'
+                    combinedCode[int(last.split('_')[0])].data = combinedCode[int(last.split('_')[0])].data.split('(')[0] + insert
+                    s.clear()
+                    s.append(item[to_try_tracker[j]])
+                last = key[0]
+                j += 1
 
-        insert = ','.join([d.name for d in s])
-        insert = f'({insert})'
+            # print(to_try_tracker)
+            to_try_tracker[-1] += 1
+            insert = ','.join([d.name for d in s])
+            insert = f'({insert})'
+            combinedCode[int(last.split('_')[0])].data = combinedCode[int(last.split('_')[0])].data.split('(')[0] + insert
 
-        combinedCode[int(last.split('_')[0])].data = combinedCode[int(last.split('_')[0])].data.split('(')[0]
-        combinedCode[int(last.split('_')[0])].data += insert
-        # just return the first values in the dictionary for now
+            #################### Run and Get Results #####################
+            print()
+            print("5: Compile Check  =========================")
+            self.write_code_from_list('out.py', combinedCode)
 
-        return combinedCode
+            if self.compile_new_code('out.py') == "":
+                print("Compile Successful")
+                print()
+                print("6: Run Test Cases  ========================")
+                result = self.run_test_cases('out.py', [([1, 2, 3, 4], 3), ([151, 1531, 1763, 41632], 151), ([2], 2), ([-1, 2, 45, 3], 3)])
+                if result == "next method": break
+                elif result == "passed cases": return "successful", combinedCode
+            print("Compile Failed")
+            ##############################################################
+
+        return "failed", combinedCode
+
+
 
     def evolve(self, pools, test_cases):
         methods_in_solution = len(pools)
         token_methods = []
         token_calls = []
+        combinedCode = None
         # print("number of method in solution", methods_in_solution)
         ######### Load Template as Token and Predicted Code ##########
         print()
         print("4: Code from Docs Selected  ===============")
-        baseCode = self.load_empty_template_as_list()
         for data in pools:
             temp_method = []
             temp_call = []
@@ -180,21 +222,24 @@ class engine:
             token_calls.append(temp_call)
         ##############################################################
 
-        #################### Handle Input Args #######################
-        combinedCode = self.set_inputs(baseCode, inputs)
-        ##############################################################
-
         ################## Combining Code loop #######################
         combo_counter = [len(row) for row in token_calls]
         combo_tracker = [0] * len(combo_counter)
         while combo_counter[0] > combo_tracker[0]:
+            #################### Handle Input Args #######################
+            baseCode = self.load_empty_template_as_list()
+            combinedCode = self.set_inputs(baseCode, inputs)
+            ##############################################################
+            print(combo_tracker)
             i = len(combo_tracker)-1
-            combo_tracker[i] += 1
+
             while combo_tracker[i] >= combo_counter[i]:
                 combo_tracker[i] = 0
                 i-=1
                 combo_tracker[i] += 1
                 if i == 0: break
+
+            if combo_tracker[0] >= combo_counter[0]: break
 
             for method_index in range(methods_in_solution):
                 combinedCode = self.combine(combinedCode, token_methods[method_index][combo_tracker[method_index]], 'METHOD')
@@ -204,30 +249,15 @@ class engine:
             combinedCode = self.set_output(combinedCode, outputs)
             ##############################################################
 
-            ####################### String Vars ##########################
-            # combinedCode = driver.string_vars(combinedCode, inputs)
+            ####################### evolve Vars ##########################
+            message, combinedCode = driver.evolve_vars(combinedCode, inputs)
+            if message == 'successful': break
             ##############################################################
 
-            self.write_code_from_list('out.py', combinedCode)
+            combo_tracker[i] += 1
 
-            exit()
         ##############################################################
-
-
-
-
-
-        #################### Run and Get Results #####################
-        print()
-        print("5: Compile Check  =========================")
-
-        self.compile_new_code('out.py')
-        print()
-        print("6: Run Test Cases  ========================")
-        self.run_test_cases('out.py',
-                              [([1, 2, 3, 4], 3), ([151, 1531, 1763, 41632], 151), ([2], 2), ([-1, 2, 45, 3], 3)])
-        ##############################################################
-        return
+        return combinedCode
 
 
 
@@ -248,6 +278,7 @@ class engine:
             print(stdout.decode('utf-8'))
         if stderr:
             print(stderr.decode('utf-8'))
+        return stderr.decode('utf-8')
 
 
 
@@ -318,7 +349,12 @@ class engine:
         out = getattr(__import__(name), 'Solution')
         ref = out()
         for case in cases:
-            print(ref.run(case[0],case[1]))
+            try:
+                print(ref.run(case[0],case[1]))
+                return "passed cases"
+            except Exception as e:
+                print(e)
+                return "next method"
 
 
     def print_specialdata(self, data, label=""):
@@ -351,7 +387,7 @@ if __name__ == '__main__':
     ######################## Create pools ########################
     print()
     print("3: Suggested Code =========================")
-    pools = driver.collect_pool(actions, live=True, num=7)
+    pools = driver.collect_pool(actions, live=False, num=4)
     print(pools)
     # ############################################################
 
