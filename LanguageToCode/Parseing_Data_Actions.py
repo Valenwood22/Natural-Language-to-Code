@@ -185,13 +185,29 @@ class parser:
         return
 
 
+
+    def print_specialdata(self, data, label=""):
+        print(f"num {label}: {len(data)}")
+        for d in data:
+            print(d)
+
 if __name__ == '__main__':
     engine = parser()
-    engine.display('Given a list and an integer x. Remove x from the list')
-    # top_50_Leet = open('N:\\_Programming\\openai\\data\\LeetCode_Easy_dataset.txt')
+    # engine.display('Given a list and an integer x. Remove x from the list')
+    # top_50_Leet = open('N:\\_Programming\\nltc\\data\\LeetCode_Easy_dataset.txt')
     # p1 = top_50_Leet.readline()
+    p1 = 'Write a function to find the longest common prefix string amongst an array of strings.'
     # p2 = top_50_Leet.readline()
     # p3 = top_50_Leet.readline()
     # p4 = top_50_Leet.readline()
     # p5 = top_50_Leet.readline()
-    # engine.parse(p3)
+    print(p1)
+    inputs, outputs, actions = engine.parse(p1)
+    engine.print_specialdata(inputs, "Inputs")
+    print("===================================")
+    engine.print_specialdata(outputs, "Outputs")
+
+    print("===================================")
+    # actions = [["two", "numbers", "add", "up", "to", "target"]]
+    print(actions)
+

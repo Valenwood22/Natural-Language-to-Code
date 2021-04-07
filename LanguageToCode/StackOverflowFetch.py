@@ -139,7 +139,7 @@ class fromTheOverflow:
 
 
     def filter(self, ready_code, code_qid):
-        # print(ready_code)
+        print(ready_code)
         # print(code_qid)
         defName = "NONE"
         params = "NONE"
@@ -154,7 +154,10 @@ class fromTheOverflow:
                     defLine = i
                     # Find def name
                     defName = line.split(' ', 1)[1]
-                    defName, params = defName.split('(')
+                    signature_split = defName.split('(')
+                    if len(signature_split) != 2: continue  # TODO: Handle parentheses in signature
+                    defName = signature_split[0]
+                    params = signature_split[1]
                     # Find params
                     params = params.replace('):', '')
                     params = params.split(',')

@@ -16,6 +16,9 @@ from Parseing_Data_Actions import parser
 from Parseing_Data_Actions import dataType
 from collections import OrderedDict
 from StackOverflowFetch import fromTheOverflow
+import sys
+import copy
+import time
 
 class codeObj:
     def __init__(self, data, indents):
@@ -100,7 +103,7 @@ class engine:
 
 
 
-    def evolve_vars(self, combinedCode, inputs):
+    def evolve_vars(self, combinedCode, inputs, test_cases):
 
         def find_predictions(param, input_pool, shortenedWords):
             ans = []
@@ -132,7 +135,10 @@ class engine:
             # 2. Find holes
             if '#TAG-VAR' in run_line.data:
                 # print(run_line.data)
-                call, extracted = run_line.data.split('(')
+                signature_split = run_line.data.split('(')
+                if len(signature_split) != 2: continue # TODO: Handle parentheses in signature
+                call = signature_split[0]
+                extracted = signature_split[1]
                 extracted = extracted.split(')')[0]
                 params = extracted.split(',')
                 if run_line.data[:6] != 'return':
@@ -178,7 +184,7 @@ class engine:
                 last = key[0]
                 j += 1
 
-            # print(to_try_tracker)
+            print("Vars to try")
             to_try_tracker[-1] += 1
             insert = ','.join([d.name for d in s])
             insert = f'({insert})'
@@ -189,12 +195,21 @@ class engine:
             print("5: Compile Check  =========================")
             self.write_code_from_list('out.py', combinedCode)
 
+
+
             if self.compile_new_code('out.py') == "":
                 print("Compile Successful")
                 print()
                 print("6: Run Test Cases  ========================")
-                result = self.run_test_cases('out.py', [([1, 2, 3, 4], 3), ([151, 1531, 1763, 41632], 151), ([2], 2), ([-1, 2, 45, 3], 3)])
-                if result == "next method": break
+
+                ####### Debugging ##########################
+                # for line in combinedCode:
+                #     print(' ' * line.indents + line.data)
+                # print(test_cases)
+                ############################################
+
+                result = self.run_test_cases('out.py', test_cases)
+                if result == "next method": continue
                 elif result == "passed cases": return "successful", combinedCode
             print("Compile Failed")
             ##############################################################
@@ -230,7 +245,7 @@ class engine:
             baseCode = self.load_empty_template_as_list()
             combinedCode = self.set_inputs(baseCode, inputs)
             ##############################################################
-            print(combo_tracker)
+            # print(combo_tracker)
             i = len(combo_tracker)-1
 
             while combo_tracker[i] >= combo_counter[i]:
@@ -249,11 +264,12 @@ class engine:
             combinedCode = self.set_output(combinedCode, outputs)
             ##############################################################
 
+            print(f"========== Running method {combo_tracker} ==========")
             ####################### evolve Vars ##########################
-            message, combinedCode = driver.evolve_vars(combinedCode, inputs)
+            message, combinedCode = driver.evolve_vars(combinedCode, inputs, test_cases)
             if message == 'successful': break
             ##############################################################
-
+            print(f"=========================================================")
             combo_tracker[i] += 1
 
         ##############################################################
@@ -262,8 +278,8 @@ class engine:
 
 
     def write_code_from_list(self, filename, code):
-        outFile = open(filename, 'r+')
-        outFile.truncate(0)
+        outFile = open(filename, 'w')
+        # outFile.truncate(0)
         for line in code:
             outFile.write(' '*line.indents+line.data+'\n')
         outFile.close()
@@ -303,11 +319,11 @@ class engine:
         ftf = fromTheOverflow()
         for action in actions:
             temp = []
-            docs_return = driver.predict_from_docs(action, 'algorithms')
-            if len(docs_return) == 0:
-                temp = ftf.run(''.join(action), live=live, num=num)
-            else:
-                temp = docs_return
+            # docs_return = driver.predict_from_docs(action, 'algorithms')
+            # if len(docs_return) == 0:
+            temp = ftf.run(' '.join(action), live=live, num=num)
+            # else:
+            #     temp = docs_return
             pool.append(temp)
         return pool
 
@@ -348,20 +364,31 @@ class engine:
         name = filename.split('.')[0]
         out = getattr(__import__(name), 'Solution')
         ref = out()
-        for case in cases:
+        cases_passed = [False] * len(cases)
+        copy_cases = copy.deepcopy(cases) # Some how the test cases are being edited so this is a deep copy
+        for i, case in enumerate(copy_cases):
             try:
-                print(ref.run(case[0],case[1]))
-                return "passed cases"
+                rtrn = ref.run(*case[0])
+                print("return:", rtrn, "inputs:", case[0], "answer:", case[1])
+                if rtrn == case[1]:
+                    cases_passed[i] = True
             except Exception as e:
                 print(e)
-                return "next method"
+            print(f"Case {i} Passed: {cases_passed[i]}")
+
+        sys.modules.pop('out')
+        if 0 in cases_passed:
+            return "next method"
+        else:
+            return "passed cases"
+
+
 
 
     def print_specialdata(self, data, label=""):
         print(f"num {label}: {len(data)}")
         for d in data:
             print(d)
-        # print(' ================ ')
 
 
 
@@ -372,25 +399,34 @@ if __name__ == '__main__':
     # p3 = top_50_Leet.readline()
     # p4 = top_50_Leet.readline()
     # p5 = top_50_Leet.readline()
-
+    # p1 = "Given a list and an integer x. Remove every x from the list. Then print the list", [(([1, 2, 3, 4], 3), "[1, 2, 3]"), (([151, 1531, 1763, 41632], 151), "[1531, 1763, 41632]"), (([2], 2),"[]"), (([-1, 2, 45, 3], 3),"[-1, 2, 45]")]
+    t0 = time.time()
     driver = engine()
 
+    prompt = "Write a function to find the longest common prefix string amongst an array of strings."
+    test_cases = [([["flower","flow","flight"]], "fl"), ([["dog","racecar","car"]], "")]
+
     # inputs, outputs, actions = driver.nlp_user_query("Given a list and an integer x. Remove every x from the list") # "Given a list and an integer x. Return True if x is in the list"
-    inputs, outputs, actions = driver.nlp_user_query("Given a list and an integer x. Remove every x from the list. Then print the list")
+    print(prompt)
+    inputs, outputs, actions = driver.nlp_user_query(prompt)
     print("1: Predicted Inputs and Outputs ===========")
     driver.print_specialdata(inputs, 'inputs')
     driver.print_specialdata(outputs, 'outputs')
     print()
     print("2: Predicted Actions ======================")
+    actions = [['find','longest','common','prefix']]
     print(actions)
 
     ######################## Create pools ########################
     print()
     print("3: Suggested Code =========================")
-    pools = driver.collect_pool(actions, live=False, num=4)
+    pools = driver.collect_pool(actions, live=True, num=2)
     print(pools)
-    # ############################################################
+    ##############################################################
 
     ##################### Begin the Evolution ####################
-    driver.evolve(pools, [([1, 2, 3, 4], 3), ([151, 1531, 1763, 41632], 151), ([2], 2), ([-1, 2, 45, 3], 3)])
-    ##############################################################
+    driver.evolve(pools, test_cases)
+    #############################################################
+
+    print(f"Finished in: {time.time()-t0:.4f}s")
+
