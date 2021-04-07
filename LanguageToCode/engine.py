@@ -35,7 +35,7 @@ class engine:
         self.db_key = {'PID':0, 'name':1, 'payload':2, 'call':3, 'parameters':4, 'return':5}
         self.shortenedWords = defaultdict(str,{'int':'integer', 'str':'string', 'bool':'boolean'})
         self.interchangeableWords = defaultdict(str, {'int': 'integer', 'str': 'string', 'bool': 'boolean', 'integer': 'int', 'string': 'str', 'boolean': 'bool'})
-
+        self.error_dict = {"import numpy as np":0}
 
     def load_empty_template_as_list(self):
         template = open('N:\\_Programming\\nltc\\data\\EmptyTemplate.tmplt','r')
@@ -184,7 +184,6 @@ class engine:
                 last = key[0]
                 j += 1
 
-            print("Vars to try")
             to_try_tracker[-1] += 1
             insert = ','.join([d.name for d in s])
             insert = f'({insert})'
@@ -209,11 +208,26 @@ class engine:
                 ############################################
 
                 result = self.run_test_cases('out.py', test_cases)
+                while result in self.error_dict: # Test case loop for simple adjustments
+                    if self.error_dict[result] > 3:
+                        result = "next method"
+                        break
+                    if result == "import numpy as np":
+                        combinedCode = self.combine(combinedCode, [codeObj('import numpy as np', 0)], 'IMPORT')
+                        print("added: import numpy as np")
+                    self.error_dict[result] += 1
+                    self.write_code_from_list('out.py', combinedCode)
+                    # for line in combinedCode:
+                    #     print(line)
+                    result = self.run_test_cases('out.py', test_cases)
+
+
                 if result == "next method": continue
                 elif result == "passed cases": return "successful", combinedCode
+                else: print("UNKNOWN ERROR")
             print("Compile Failed")
             ##############################################################
-
+        for v in self.error_dict.values(): v = 0
         return "failed", combinedCode
 
 
@@ -264,12 +278,12 @@ class engine:
             combinedCode = self.set_output(combinedCode, outputs)
             ##############################################################
 
-            print(f"========== Running method {combo_tracker} ==========")
+            print(f"========== Running method {combo_tracker} ==============================")
             ####################### evolve Vars ##########################
             message, combinedCode = driver.evolve_vars(combinedCode, inputs, test_cases)
             if message == 'successful': break
             ##############################################################
-            print(f"=========================================================")
+            print(f"=========================================================================")
             combo_tracker[i] += 1
 
         ##############################################################
@@ -373,6 +387,9 @@ class engine:
                 if rtrn == case[1]:
                     cases_passed[i] = True
             except Exception as e:
+                if str(e) == "name 'np' is not defined":
+                    sys.modules.pop('out')
+                    return "import numpy as np"
                 print(e)
             print(f"Case {i} Passed: {cases_passed[i]}")
 
@@ -402,9 +419,11 @@ if __name__ == '__main__':
     # p1 = "Given a list and an integer x. Remove every x from the list. Then print the list", [(([1, 2, 3, 4], 3), "[1, 2, 3]"), (([151, 1531, 1763, 41632], 151), "[1531, 1763, 41632]"), (([2], 2),"[]"), (([-1, 2, 45, 3], 3),"[-1, 2, 45]")]
     t0 = time.time()
     driver = engine()
+    # driver.run_test_cases('out.py',[([[1,2,3,4]], [1,3,6,10])])
+    # exit()
 
-    prompt = "Write a function to find the longest common prefix string amongst an array of strings."
-    test_cases = [([["flower","flow","flight"]], "fl"), ([["dog","racecar","car"]], "")]
+    prompt = "Given an array nums. Return the running sum of nums."
+    test_cases = [([[1,2,3,4]], [1,3,6,10]), ([[1,1,1,1,1]], [1,2,3,4,5]), ([[3,1,2,10,1]], [3,4,6,16,17])]
 
     # inputs, outputs, actions = driver.nlp_user_query("Given a list and an integer x. Remove every x from the list") # "Given a list and an integer x. Return True if x is in the list"
     print(prompt)
@@ -414,13 +433,13 @@ if __name__ == '__main__':
     driver.print_specialdata(outputs, 'outputs')
     print()
     print("2: Predicted Actions ======================")
-    actions = [['find','longest','common','prefix']]
+    actions = [['running','sum','of','array']]
     print(actions)
 
     ######################## Create pools ########################
     print()
     print("3: Suggested Code =========================")
-    pools = driver.collect_pool(actions, live=True, num=2)
+    pools = driver.collect_pool(actions, live=False, num=3)
     print(pools)
     ##############################################################
 

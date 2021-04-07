@@ -138,19 +138,58 @@ class fromTheOverflow:
 
 
 
-    def filter(self, ready_code, code_qid):
-        print(ready_code)
+    def filter(self, ready_code, code_qid, desc):
+        # print(ready_code)
         # print(code_qid)
-        defName = "NONE"
-        params = "NONE"
-        call = "NONE"
-        payload = "NONE"
         passed_filter = []
         for q_index, code in enumerate(ready_code):
+            defName = "NONE"
+            params = "NONE"
+            call = "NONE"
+            payload = "NONE"
             baseCode = self.load_empty_template_as_list()
             lines = code.split('\n')
             for i, line in enumerate(lines):
-                if line[:3] == 'def':
+                if len(lines) == 1:
+                    return_statement = "NONE"
+                    defName = '_'.join(desc.split(" "))
+                    split_line = line.split('=')
+                    if len(split_line) == 1:
+                        return_statement = split_line[0].strip()
+                        if return_statement[:5] != "print":
+                            return_statement = 'return ' + return_statement
+                        else: break
+                    elif len(split_line) == 2:
+                        var = split_line[0].strip()
+                        return_statement = split_line[1].strip()
+                        if return_statement[:5] != "print":
+                            return_statement = 'return ' + return_statement
+                        else: break
+                    else: break
+
+                    if return_statement != "NONE": # Find parameters
+                        signature_split = return_statement.split('(')
+                        if len(signature_split) != 2: continue  # TODO: Handle parentheses in signature
+                        signature_split_1 = signature_split[0]
+                        params = signature_split[1]
+                        # Find params
+                        params = params.replace(')', '')
+                        params = params.split(',')
+                        params = [p.strip() for p in params]
+                        str_params = ','.join(params)
+
+                        # Find call
+                        call = 'self.' + defName + '(' + '#TAG-VAR,' * len(params)
+                        call = call[:-1] + ')'
+
+                        # insert the new function header
+                        lines = [f"def {defName}({str_params}):", f'    {return_statement}']
+                        defLine = 0
+
+                elif line[:3] == 'def':
+                    """
+                    Handle straight methods in the code
+                    """
                     defLine = i
                     # Find def name
                     defName = line.split(' ', 1)[1]
@@ -168,7 +207,9 @@ class fromTheOverflow:
                     call = 'self.' + defName + '(' + '#TAG-VAR,' * len(params)
                     call = call[:-1] + ')'
                     # print(defName, params, call)
+
             if defName != "NONE" and params != "NONE" and call != "NONE":
+                # print(lines)
                 if 'self' in params[0] or params[0] == '':
                     if len(params) == 0:
                         payload = 'def '+defName+'('+','.join(params) + '):\n'
@@ -228,10 +269,12 @@ class fromTheOverflow:
             res = res.rstrip("\n")
             ready_code.append(res)
 
+        # code_qid = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+        # ready_code = ['y = np.cumsum(x)', 'y = np.add.accumulate(x)', "import multiprocessing\nimport numpy as np\nimport thread\n\nclass Sum: #again, this class is from ParallelPython's example code (I modified for an array and added comments)\n    def __init__(self):\n        self.value = np.zeros((1,512*512)) #this is the initialization of the sum\n        self.lock = thread.allocate_lock()\n        self.count = 0\n\n    def add(self,value):\n        self.count += 1\n        self.lock.acquire() #lock so sum is correct if two processes return at same time\n        self.value += value #the actual summation\n        self.lock.release()\n\ndef computation(index):\n    array1 = np.ones((1,512*512))*index #this is where the array-returning computation goes\n    return array1\n\ndef summers(num_iters):\n    pool = multiprocessing.Pool(processes=8)\n\n    sumArr = Sum() #create an instance of callback class and zero the sum\n    for index in range(num_iters):\n        singlepoolresult = pool.apply_async(computation,(index,),callback=sumArr.add)\n\n    pool.close()\n    pool.join() #waits for all the processes to finish\n\n    return sumArr.value", 'is_sum = lambda seq, x: any(x == y + z for yi, y in enumerate(seq) for zi, z in enumerate(seq) if zi != yi)', 'sorty = []\ni = 0\nfor n in range(len(nums)):\n            print(n)\n            if sum(sorty) &lt;= sum(nums):\n                sorty.append(nums[-1])\n                nums.pop()\n            else: \n                break\n\nreturn sorty', 'arr = np.array([0.1, 1, 1.2, 0.5, -0.3, -0.2, 0.1, 0.5, 1])\nw = 3  #rolling window\n\narr[arr&lt;0]=0\n\nshape = arr.shape[0]-w+1, w  #Expected shape of view (7,3)\nstrides = arr.strides[0], arr.strides[0] #Strides (8,8) bytes\nrolling = np.lib.stride_tricks.as_strided(arr, shape=shape, strides=strides)\n\nrolling_sum = np.sum(rolling, axis=1)\nrolling_sum', "import sys\nimport random\nimport time\nimport multiprocessing\nimport numpy as np\n\nnumpows = 5\nnumitems = 25\nnprocs = 4\n\ndef expensiveComputation( i ):\n  time.sleep( random.random() * 10 )\n  return np.array([i**j for j in range(numpows)])\n\ndef listsum( l ):\n  sum = np.zeros_like(l[0])\n  for item in l:\n    sum = sum + item\n  return sum\n\ndef partition(lst, n):\n  division = len(lst) / float(n)\n  return [ lst[int(round(division * i)): int(round(division * (i + 1)))] for i in xrange(n) ]\n\ndef myRunningSum( l ):\n  sum = np.zeros(numpows)\n  for item in l:\n     sum = sum + expensiveComputation(item)\n  return sum\n\nif __name__ == '__main__':\n\n  random.seed(1)\n  data = range(numitems)\n\n  pool = multiprocessing.Pool(processes=4,)\n  calculations = pool.map(myRunningSum, partition(data,nprocs))\n\n  print 'Answer is:', listsum(calculations)\n  print 'Expected answer: ', np.array([25.,300.,4900.,90000.,1763020.])", 'st_age = [0]*3 \nfor g in range(3):\n    st_age[g] = int(input("Enter student age "))\n\ng = sum = 0 \nwhile g &lt; len(st_age): #am I using this correctly? \n    sum = sum + st_age[g]\n    g += 1\n\nprint sum', 'out = ((Orginal - Mutated)**2).sum()', 'print(x[0:np.flatnonzero(x.cumsum()&gt;userNum)[0]+1])', "def testFunction(array):\n    s = 0\n    for i in array:\n        s += i    \n    mx = s\n    print('The sum of {} is: {}'.format(array, s))\n    k = 1\n    for i in array[:-1]: \n        s -= i \n        print('The sum of {} is: {}'.format(array[k:], s))\n        mx = mx if s &lt; mx else s \n        k += 1\n    return mx\n\nprint(testFunction([1, 2, -3, 4, 5]))", 'difference = np.abs(y_test_predicted - y_test_unscaled)\nerror = difference / y_test_predicted\nav_error = np.mean(error)', 'import numpy as np\n\n\ndef rolling_window(a, window):\n    &quot;&quot;&quot;Recipe from https://stackoverflow.com/q/6811183/4001592&quot;&quot;&quot;\n    shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)\n    strides = a.strides + (a.strides[-1],)\n    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)\n\n\na = np.array([0.1, 1, 1.2, 0.5, -0.3, -0.2, 0.1, 0.5, 1])\n\nres = rolling_window(np.clip(a, 0, a.max()), 3).sum(axis=1)\nprint(res)', "In [20]: np.correlate(arr.clip(0), np.ones(3), mode='valid')\nOut[20]: array([2.3, 2.7, 1.7, 0.5, 0.1, 0.6, 1.6])", "\nlist_1 = []\nlist_2 = [0]\nlist_3 = [0, 0]\nlist_4 = [0, 0, 0]\nlist_5 = [-2, 4, -2, 4]\nlist_6 = [2, -4, 2, -4]\n\nt_list = [ 2, 6\n          , -3\n          , 7\n          , -2, -5\n          , 10, 13, 13, 13, 13, 12, 12, 12, 12, 12, 8, 8, 8, 8, 8, 8\n          , -9\n          , 8\n          , -9, -9, -9, -9, -9, -9, -9, -9\n          , 12, 12, 12, 12, 12\n           ]  # expected result: [6, -3, 7, -5, 13, -9, 8]\n\nall_lists = [list_1, list_2, list_3, list_4, list_5, list_6, t_list]\n\ndef sign_differs(n1, n2):\n    '''return True if n1 and n2 have different signs.'''\n    return n1 &lt; 0 and n2 &gt;= 0 or n1 &gt;= 0 and n2 &lt; 0\n\nfor a_list in all_lists:\n    print(f'a_list: {a_list}')\n\n    sum_list = []\n    prev_idx = 0\n    for idx in range(1, len(a_list)):\n        n1, n2 = a_list[idx-1], a_list[idx]\n        if n1 in sum_list:\n            continue\n        if sign_differs(n1, n2):  # +/- or -/+ detected\n            if a_list[prev_idx] &gt;= 0:\n                max_abs = max(a_list[prev_idx:idx])  # largest positive\n            else:\n                max_abs = min(a_list[prev_idx:idx])  # smallest negative\n\n            if not max_abs in sum_list:\n                sum_list.append(max_abs)\n            prev_idx = idx\n\n    print(f'sum_list: {sum_list}\\n')"]
         # print(ready_code)
 
-        filtered_code = self.filter(ready_code, code_qid)
-        # print(filtered_code)
+        filtered_code = self.filter(ready_code, code_qid, desc)
+
         # Read code and load into data base
         for i, snippet in enumerate(filtered_code):
             self.load_into_db(snippet, desc)
@@ -240,4 +283,4 @@ class fromTheOverflow:
         return self.get_recent(len(ready_code), 'algorithms_temp')
 
 if __name__ == '__main__':
-    print(fromTheOverflow().run("print list"))
+    print(fromTheOverflow().run("running sum of array"))

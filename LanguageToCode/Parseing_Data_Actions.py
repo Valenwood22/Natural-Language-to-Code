@@ -196,7 +196,7 @@ if __name__ == '__main__':
     # engine.display('Given a list and an integer x. Remove x from the list')
     # top_50_Leet = open('N:\\_Programming\\nltc\\data\\LeetCode_Easy_dataset.txt')
     # p1 = top_50_Leet.readline()
-    p1 = 'Write a function to find the longest common prefix string amongst an array of strings.'
+    p1 = 'Given an array nums. Return the running sum of nums.'
     # p2 = top_50_Leet.readline()
     # p3 = top_50_Leet.readline()
     # p4 = top_50_Leet.readline()
